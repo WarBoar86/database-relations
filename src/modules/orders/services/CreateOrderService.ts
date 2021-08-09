@@ -20,13 +20,53 @@ interface IRequest {
 @injectable()
 class CreateOrderService {
   constructor(
+    @inject('OrdersRepository')
     private ordersRepository: IOrdersRepository,
+    @inject('ProductsRepository')
     private productsRepository: IProductsRepository,
+    @inject('CustomersRepository')
     private customersRepository: ICustomersRepository,
   ) {}
 
   public async execute({ customer_id, products }: IRequest): Promise<Order> {
     // TODO
+    const customer = await this.customersRepository.findById(customer_id);
+
+    if (!customer) {
+      throw new AppError('Customer not found');
+    }
+    const listProducts = (
+      await this.productsRepository.findAllById(products)
+    ).map(p => ({
+      product_id: p.id,
+      quantity: p.quantity,
+      price: p.price,
+    }));
+
+    if (listProducts.length <= 0) {
+      throw new AppError('Products not found');
+    }
+
+    const checkedQTDProducts = await this.productsRepository.updateQuantity(
+      listProducts.map(p => ({ id: p.product_id, quantity: p.quantity })),
+    );
+
+    if (checkedQTDProducts.length !== listProducts.length) {
+      throw new AppError('Insuficient products quantity');
+    }
+
+    const orderProducts = checkedQTDProducts.map(pd => ({
+      product_id: pd.id,
+      quantity: pd.quantity,
+      price: pd.price,
+    }));
+
+    const createOrder = await this.ordersRepository.create({
+      customer,
+      products: orderProducts, // listProducts,
+    });
+
+    return createOrder;
   }
 }
 
