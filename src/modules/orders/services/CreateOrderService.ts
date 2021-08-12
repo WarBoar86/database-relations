@@ -31,52 +31,46 @@ class CreateOrderService {
   public async execute({ customer_id, products }: IRequest): Promise<Order> {
     // TODO
     const customer = await this.customersRepository.findById(customer_id);
+    const storagedProducts = await this.productsRepository.findAllById(
+      products,
+    );
 
     if (!customer) {
       throw new AppError('Customer not found');
     }
 
-    const listProducts = (
-      await this.productsRepository.findAllById(products)
-    ).map(p => ({
-      product_id: p.id,
-      quantity: products.find(e => e.id === p.id)?.quantity || 0,
-      price: p.price,
-    }));
-
-    if (listProducts.length === 0) {
-      throw new AppError('Products not found');
+    if (storagedProducts.length === 0) {
+      throw new AppError('No products matches');
     }
 
-    const uProducts = listProducts.map(p => ({
-      id: p.product_id,
-      quantity: p.quantity,
-    }));
+    const productsToUpdate: IProduct[] = products.map((p, index) => {
+      if (storagedProducts[index].quantity < p.quantity) {
+        throw new AppError('Insuficient products quantity');
+      }
+      return {
+        id: p.id,
+        quantity: p.quantity,
+      };
+    });
 
-    const checkedQTDProducts = await this.productsRepository.updateQuantity(
-      uProducts,
+    const checkedQtdProducts = await this.productsRepository.updateQuantity(
+      productsToUpdate,
     );
 
-    if (checkedQTDProducts.length === 0) {
-      throw new AppError('Insufiicient products Qtd.');
-    }
+    const orderProducts = checkedQtdProducts.map((e, index) => {
+      return {
+        product_id: e.id,
+        price: e.price,
+        quantity: products[index].quantity,
+      };
+    });
 
-    const orderProducts = checkedQTDProducts.map(pd => ({
-      product_id: pd.id,
-      quantity: pd.quantity,
-      price: pd.price,
-    }));
-
-    // if (orderProducts.length === 0) {
-    //   throw new AppError('Empity List');
-    // }
-
-    const createOrder = await this.ordersRepository.create({
+    const newOrder = await this.ordersRepository.create({
       customer,
       products: orderProducts,
     });
 
-    return createOrder;
+    return newOrder;
   }
 }
 
