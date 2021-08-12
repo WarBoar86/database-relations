@@ -12,6 +12,8 @@ interface IFindProducts {
 class ProductsRepository implements IProductsRepository {
   private ormRepository: Repository<Product>;
 
+  private updatedListProducts: Product[] = [];
+
   constructor() {
     this.ormRepository = getRepository(Product);
   }
@@ -60,21 +62,21 @@ class ProductsRepository implements IProductsRepository {
   ): Promise<Product[]> {
     // TODO
 
-    const uListProducts: Product[] = [];
-
     products.forEach(async pd => {
-      const fProuct = await this.ormRepository.findOne({
+      const foundProduct = await this.ormRepository.findOne({
         where: {
           id: pd.id,
         },
       });
-      if (fProuct !== undefined && fProuct.quantity >= pd.quantity) {
-        fProuct.quantity -= pd.quantity;
-        uListProducts.push(fProuct);
+
+      if (foundProduct !== undefined && foundProduct.quantity >= pd.quantity) {
+        foundProduct.quantity -= pd.quantity;
+        await this.ormRepository.save(foundProduct);
+        this.updatedListProducts.push(foundProduct);
       }
     });
 
-    return uListProducts;
+    return this.updatedListProducts;
   }
 }
 

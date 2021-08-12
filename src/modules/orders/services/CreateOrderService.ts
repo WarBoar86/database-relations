@@ -35,24 +35,30 @@ class CreateOrderService {
     if (!customer) {
       throw new AppError('Customer not found');
     }
+
     const listProducts = (
       await this.productsRepository.findAllById(products)
     ).map(p => ({
       product_id: p.id,
-      quantity: p.quantity,
+      quantity: products.find(e => e.id === p.id)?.quantity || 0,
       price: p.price,
     }));
 
-    if (listProducts.length <= 0) {
+    if (listProducts.length === 0) {
       throw new AppError('Products not found');
     }
 
+    const uProducts = listProducts.map(p => ({
+      id: p.product_id,
+      quantity: p.quantity,
+    }));
+
     const checkedQTDProducts = await this.productsRepository.updateQuantity(
-      listProducts.map(p => ({ id: p.product_id, quantity: p.quantity })),
+      uProducts,
     );
 
-    if (checkedQTDProducts.length !== listProducts.length) {
-      throw new AppError('Insuficient products quantity');
+    if (checkedQTDProducts.length === 0) {
+      throw new AppError('Insufiicient products Qtd.');
     }
 
     const orderProducts = checkedQTDProducts.map(pd => ({
@@ -61,9 +67,13 @@ class CreateOrderService {
       price: pd.price,
     }));
 
+    // if (orderProducts.length === 0) {
+    //   throw new AppError('Empity List');
+    // }
+
     const createOrder = await this.ordersRepository.create({
       customer,
-      products: orderProducts, // listProducts,
+      products: orderProducts,
     });
 
     return createOrder;
